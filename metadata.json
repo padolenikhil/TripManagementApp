@@ -1,0 +1,6 @@
+{
+  "name": "Trip Management ",
+  "description": "A web application to manage trip expenses, track who paid for what, and calculate how much each person owes or is owed. Data is stored locally in the browser.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
