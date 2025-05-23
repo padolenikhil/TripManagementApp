@@ -1,12 +1,15 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Trip, Participant, Expense, CalculatedExpenseData, Settlement, ManualTransaction } from './types';
 import { loadTripsFromGist, saveTripsToGist } from './services/storageService';
 import Modal from './components/Modal';
+import FuelCalculator from './components/FuelCalculator'; // Import FuelCalculator
 
 type Theme = 'light' | 'dark' | 'system';
 const THEME_STORAGE_KEY = 'tripExpenseApp_theme';
+type ActiveView = 'trips' | 'fuelCalculator';
 
-// --- Icon Components (no changes) ---
+// --- Icon Components ---
 const PlusIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -73,6 +76,19 @@ const ArrowUpTrayIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
+const FuelIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( // This icon can still be used internally in FuelCalculator if needed
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.03 1.121 0 1.131.094 1.976 1.057 1.976 2.192V7.5M8.25 7.5h7.5M8.25 7.5V15m7.5-7.5V15m0-6.75H16.5m-3.75 0H8.25m0 0H6.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h7.5c.621 0 1.125-.504 1.125-1.125V8.625c0-.621-.504-1.125-1.125-1.125H12.75" />
+  </svg>
+);
+
+const CalculatorIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V13.5Zm0 2.25h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V18Zm2.498-6.75h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V13.5Zm0 2.25h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V18Zm2.504-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5Zm0 2.25h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V18Zm2.498-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5ZM8.25 6.75h7.5v7.5h-7.5V6.75Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+);
+
 
 const getInitialTheme = (): Theme => {
   if (typeof window !== 'undefined') {
@@ -106,6 +122,8 @@ const App: React.FC = () => {
   const [paymentAmountInput, setPaymentAmountInput] = useState<number | ''>('');
 
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [activeView, setActiveView] = useState<ActiveView>('trips');
+
 
   // GitHub Gist State
   const [githubToken, setGithubToken] = useState<string>(localStorage.getItem('app_github_pat') || '');
@@ -148,7 +166,6 @@ const App: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
   
-  // Store GitHub token and Gist ID in localStorage for convenience (not for trips data)
   useEffect(() => {
     localStorage.setItem('app_github_pat', githubToken);
   }, [githubToken]);
@@ -167,7 +184,7 @@ const App: React.FC = () => {
       const loadedTrips = await loadTripsFromGist(dataGistId);
       setTrips(loadedTrips);
       setGistStatus({ type: 'success', message: `Successfully loaded ${loadedTrips.length} trip(s) from Gist ${dataGistId}.` });
-      setSelectedTripId(null); // Reset selected trip
+      setSelectedTripId(null); 
     } catch (error: any) {
       console.error("Gist load error:", error);
       setGistStatus({ type: 'error', message: `Failed to load from Gist: ${error.message}` });
@@ -183,7 +200,7 @@ const App: React.FC = () => {
     setGistStatus({ type: 'loading', message: 'Saving trips to Gist...' });
     try {
       const result = await saveTripsToGist(trips, githubToken, dataGistId || undefined);
-      setDataGistId(result.id); // Update Gist ID if it was newly created or to confirm update
+      setDataGistId(result.id); 
       setGistStatus({ type: 'success', message: `Successfully saved trips. Gist ID: ${result.id}. URL: ${result.html_url}` });
       alert(`Data saved to Gist!\nID: ${result.id}\nURL: ${result.html_url}\n\nPlease save this Gist ID if it's new or you want to use it later.`);
     } catch (error: any) {
@@ -210,6 +227,7 @@ const App: React.FC = () => {
 
   const handleSelectTrip = (tripId: string) => {
     setSelectedTripId(tripId);
+    setActiveView('trips'); // Ensure view is trips when a trip is selected
   };
 
   const handleDeleteTrip = (tripIdToDelete: string) => {
@@ -351,7 +369,7 @@ const App: React.FC = () => {
         return;
     }
     const amountToLog = Number(paymentAmountInput);
-    if (amountToLog > selectedSettlementForLogging.amount + 0.005) {
+    if (amountToLog > selectedSettlementForLogging.amount + 0.005) { // Add epsilon for float comparison
         alert(`Cannot log more than the owed amount of ₹${selectedSettlementForLogging.amount.toFixed(2)}.`);
         return;
     }
@@ -415,7 +433,7 @@ const App: React.FC = () => {
         }
       });
       
-      const balance = (paidThroughExpenses - costPerParticipant) - netFromManualTransactions;
+      const balance = (paidThroughExpenses - costPerParticipant) + netFromManualTransactions; 
 
       return {
         participant,
@@ -445,7 +463,7 @@ const App: React.FC = () => {
             const currentDebtor = debtors[debtorIndex];
             const currentCreditor = creditors[creditorIndex];
             
-            if (currentDebtor.id === currentCreditor.id) {
+            if (currentDebtor.id === currentCreditor.id) { 
                  if (currentDebtor.amountOwed > currentCreditor.amountDue && creditorIndex < creditors.length -1 ) creditorIndex++;
                  else if (debtorIndex < debtors.length -1 ) debtorIndex++;
                  else break; 
@@ -470,7 +488,6 @@ const App: React.FC = () => {
             if (currentCreditor.amountDue <= epsilon) creditorIndex++;
             
             if (amountToSettle <= epsilon && (debtorIndex < debtors.length && creditorIndex < creditors.length)) {
-                 // Complex advancement logic to prevent infinite loops on tiny amounts
                 if (debtors[debtorIndex].amountOwed <= epsilon && creditors[creditorIndex].amountDue > epsilon) debtorIndex++;
                 else if (creditors[creditorIndex].amountDue <= epsilon && debtors[debtorIndex].amountOwed > epsilon) creditorIndex++;
                 else if (debtors[debtorIndex].amountOwed <= epsilon && creditors[creditorIndex].amountDue <= epsilon) { debtorIndex++; creditorIndex++; }
@@ -583,13 +600,49 @@ const App: React.FC = () => {
   );
 
 
+  if (activeView === 'fuelCalculator') {
+    return (
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 transition-colors duration-300">
+        <header className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-700 dark:text-slate-100">Application Utilities</h1>
+             <button 
+                onClick={() => setActiveView('trips')}
+                className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mt-1 inline-flex items-center group text-sm"
+                aria-label="Back to Trip Management"
+              >
+                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1 group-hover:-translate-x-0.5 transition-transform">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+                Back to Trip Management
+            </button>
+          </div>
+          <ThemeSwitcher />
+        </header>
+        <FuelCalculator />
+      </div>
+    );
+  }
+
+
+  // Trips View
   if (!selectedTripId || !selectedTrip) {
     return (
       <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 transition-colors duration-300">
         <header className="mb-8 text-center relative">
-          <h1 className="text-4xl font-bold text-slate-700 dark:text-slate-100">Trip Expense Splitter</h1>
+            <div className="flex flex-col sm:flex-row justify-center items-center mb-2 space-y-2 sm:space-y-0 sm:space-x-4">
+                <h1 className="text-4xl font-bold text-slate-700 dark:text-slate-100">Trip Expense Splitter</h1>
+                <button 
+                    onClick={() => setActiveView('fuelCalculator')} 
+                    className="flex items-center bg-teal-500 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700 text-white font-medium py-2 px-4 rounded-lg shadow hover:shadow-md transition-all duration-150 ease-in-out text-sm" 
+                    title="Open Fuel Calculator"
+                    aria-label="Open Fuel Calculator"
+                >
+                    <CalculatorIcon className="h-5 w-5 mr-2" /> Fuel Calculator
+                </button>
+            </div>
           <p className="text-slate-500 dark:text-slate-400">Manage your group travel expenses with ease. Now with GitHub Gist storage!</p>
-          <ThemeSwitcher className="absolute top-0 right-0" />
+          <ThemeSwitcher className="absolute top-0 right-0 mt-2 mr-2 sm:mt-0 sm:mr-0" />
         </header>
         
         <div className="max-w-2xl mx-auto">
@@ -662,21 +715,31 @@ const App: React.FC = () => {
     );
   }
 
-  // Selected Trip View (structure remains largely the same, actions are local until saved)
+  // Selected Trip View
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 transition-colors duration-300">
       <header className="mb-6 relative">
-        <button onClick={() => setSelectedTripId(null)} className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mb-2 inline-flex items-center group" aria-label="Back to trips list">
+        <button onClick={() => {setSelectedTripId(null); setActiveView('trips');}} className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mb-2 inline-flex items-center group" aria-label="Back to trips list">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1 group-hover:-translate-x-1 transition-transform">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
           </svg>
           Back to Trips List
         </button>
-        <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-slate-700 dark:text-slate-100">{selectedTrip.name}</h1>
-            <ThemeSwitcher />
+        <div className="flex justify-between items-start sm:items-center">
+            <h1 className="text-3xl font-bold text-slate-700 dark:text-slate-100 mb-2 sm:mb-0">{selectedTrip.name}</h1>
+            <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                 <button 
+                    onClick={() => setActiveView('fuelCalculator')} 
+                    className="flex items-center bg-teal-500 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700 text-white font-medium py-2 px-3 rounded-lg shadow hover:shadow-md transition-all duration-150 ease-in-out text-sm" 
+                    title="Open Fuel Calculator"
+                    aria-label="Open Fuel Calculator"
+                >
+                    <CalculatorIcon className="h-4 w-4 mr-1.5" /> Fuel Calculator
+                </button>
+                <ThemeSwitcher />
+            </div>
         </div>
-        <GistStatusDisplay /> {/* Show Gist status in trip view too */}
+        <GistStatusDisplay />
          <div className="mt-4 flex space-x-3 justify-end">
             <button
                 onClick={handleLoadFromGist}
@@ -903,7 +966,7 @@ const App: React.FC = () => {
         </aside>
       </div>
       
-      {/* Modals (structure remains the same, actions are local until saved) */}
+      {/* Modals */}
       <Modal isOpen={isAddParticipantModalOpen} onClose={() => {setIsAddParticipantModalOpen(false); setStagedParticipants([]); setParticipantNameInputForModal('');}} title="Add Participants">
         <form onSubmit={(e) => {e.preventDefault(); handleAddParticipants();}}>
           <div className="space-y-4">
